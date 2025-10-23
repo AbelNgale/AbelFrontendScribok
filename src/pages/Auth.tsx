@@ -1,0 +1,164 @@
+import { useState, useEffect } from "react";
+import { useNavigate } from "react-router-dom";
+import { useTheme } from "next-themes";
+import { useAuth } from "@/hooks/useAuth";
+import { register, login } from "@/services/auth";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { useToast } from "@/hooks/use-toast";
+import { Separator } from "@/components/ui/separator";
+import { BookOpen, Chrome } from "lucide-react";
+import logo from "@/assets/logo.png";
+import logoDark from "@/assets/logo-dark.png";
+import authBackground from "@/assets/auth-background.png";
+
+const Auth = () => {
+  const [isLogin, setIsLogin] = useState(true);
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [fullName, setFullName] = useState("");
+  const [loading, setLoading] = useState(false);
+  const navigate = useNavigate();
+  const { toast } = useToast();
+  const { theme } = useTheme();
+
+  const auth = useAuth();
+  // redireciona se já autenticado
+  useEffect(() => {
+    if (!auth.loading && auth.user) navigate("/dashboard");
+  }, [auth.user, auth.loading, navigate]);
+
+    const handleEmailAuth = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setLoading(true);
+    try {
+      if (isLogin) {
+        await auth.login(email, password); // usa o login do AuthProvider (faz me() e setUser)
+        toast({ title: "Bem-vindo!", description: "Entrou com sucesso." });
+      } else {
+        const username = fullName || email.split("@")[0];
+        await register(email, username, password);
+        toast({ title: "Conta criada!", description: "Registo efetuado com sucesso." });
+        // login automático após registo
+        await auth.login(email, password);
+      }
+      navigate("/dashboard"); // só depois do await
+    } catch (error: unknown) {
+      const err = error as { message?: string; response?: { data?: unknown } };
+      const description = err.response?.data || err.message || "Erro desconhecido";
+      toast({ title: "Erro", description: String(description), variant: "destructive" });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+
+
+  const handleGoogleAuth = async () => {
+    try {
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/dashboard`
+        }
+      });
+      if (error) throw error;
+    } catch (error: unknown) {
+      const err = error as { message?: string; response?: { data?: unknown } };
+      const description = err.response?.data || err.message || "Erro desconhecido";
+      toast({
+        title: "Erro",
+        description: String(description),
+        variant: "destructive"
+      });
+    }
+  };
+
+  return (
+    <div
+      className="min-h-screen flex items-center justify-center p-4 bg-cover bg-center"
+      style={{ backgroundImage: `url(${authBackground})` }}
+    >
+      <div className="w-full max-w-md">
+        <div className="bg-card rounded-2xl shadow-glow p-8 space-y-6">
+          {/* Logo & Title */}
+          <div className="text-center space-y-3">
+            <img src={theme === "dark" ? logoDark : logo} alt="PageSmith Hub" className="w-16 h-16 mx-auto" />
+            <p className="text-muted-foreground">
+              {isLogin ? "Bem-vindo de volta! Entre para continuar" : "Crie sua conta para começar"}
+            </p>
+          </div>
+
+          {/* Google Auth */}
+          <Button onClick={handleGoogleAuth} variant="outline" className="w-full" type="button">
+            <Chrome className="mr-2 h-4 w-4" />
+            Continuar com Google
+          </Button>
+
+          <div className="relative">
+            <Separator />
+            <span className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 bg-card px-2 text-xs text-muted-foreground">
+              OR
+            </span>
+          </div>
+
+          {/* Email Auth Form */}
+          <form onSubmit={handleEmailAuth} className="space-y-4">
+            {!isLogin && (
+              <div className="space-y-2">
+                <Label htmlFor="fullName">Nome Completo</Label>
+                <Input
+                  id="fullName"
+                  type="text"
+                  placeholder="João Silva"
+                  value={fullName}
+                  onChange={(e) => setFullName(e.target.value)}
+                  required={!isLogin}
+                />
+              </div>
+            )}
+
+            <div className="space-y-2">
+              <Label htmlFor="email">Email</Label>
+              <Input
+                id="email"
+                type="email"
+                placeholder="voce@exemplo.com"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                required
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="password">Senha</Label>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                required
+                minLength={6}
+              />
+            </div>
+
+            <Button type="submit" className="w-full bg-gradient-primary hover:opacity-90 transition-opacity" disabled={loading}>
+              {loading ? "Carregando..." : isLogin ? "Entrar" : "Criar Conta"}
+            </Button>
+          </form>
+
+          {/* Toggle Login/Signup */}
+          <div className="text-center text-sm">
+            <button type="button" onClick={() => setIsLogin(!isLogin)} className="text-primary hover:underline">
+              {isLogin ? "Não tem uma conta? Criar conta" : "Já tem uma conta? Entrar"}
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default Auth;
