@@ -1,4 +1,4 @@
-import { useEffect, useState ,useCallback } from "react";
+import { useEffect, useState, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -17,7 +17,6 @@ import {
   LogOut,
   ChevronRight,
   Edit2,
-  BookOpen,
 } from "lucide-react";
 import logo from "@/assets/logo.png";
 import logoDark from "@/assets/logo-dark.png";
@@ -29,27 +28,6 @@ interface Profile {
   email?: string;
   avatar_url?: string;
 }
-
-const mapToProfile = (u: unknown): Profile => {
-  if (!u) return {};
-  const obj = u as Record<string, unknown>;
-  const full_name =
-    typeof obj.full_name === "string"
-      ? obj.full_name
-      : typeof obj.name === "string"
-      ? obj.name
-      : typeof obj.username === "string"
-      ? obj.username
-      : "";
-  const email = typeof obj.email === "string" ? obj.email : "";
-  const avatar_url =
-    typeof obj.avatar_url === "string"
-      ? obj.avatar_url
-      : typeof obj.avatar === "string"
-      ? obj.avatar
-      : undefined;
-  return { full_name, email, avatar_url };
-};
 
 const Account = () => {
   const [profile, setProfile] = useState<Profile | null>(null);

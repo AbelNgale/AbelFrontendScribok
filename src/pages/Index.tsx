@@ -1,11 +1,13 @@
+import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import library1 from "@/assets/library-1.png";
 import library2 from "@/assets/library-2.png";
-import { useState, useEffect } from "react";
 
 const Index = () => {
   const navigate = useNavigate();
+  const auth = useAuth();
   const [currentSlide, setCurrentSlide] = useState(0);
   const [currentImage, setCurrentImage] = useState(0);
   
@@ -18,6 +20,15 @@ const Index = () => {
     "Exporte em múltiplos formatos para qualquer dispositivo",
     "Colabore com sua equipe em tempo real"
   ];
+
+  // Redireciona se já estiver autenticado
+  useEffect(() => {
+    if (auth.loading) return; // Aguarda verificação
+    
+    if (auth.user) {
+      navigate("/dashboard", { replace: true });
+    }
+  }, [auth.user, auth.loading, navigate]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -32,6 +43,18 @@ const Index = () => {
     }, 5000);
     return () => clearInterval(imageTimer);
   }, [heroImages.length]);
+
+  // Mostra loading enquanto verifica autenticação
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
   
   return (
     <div className="min-h-screen bg-background flex flex-col">

@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -9,7 +9,7 @@ import { Label } from "@/components/ui/label";
 import { useToast } from "@/hooks/use-toast";
 import { Separator } from "@/components/ui/separator";
 import { Chrome } from "lucide-react";
-import { useGoogleLogin } from "@react-oauth/google";
+import { useGoogleLogin, TokenResponse } from "@react-oauth/google";
 import logo from "@/assets/logo.png";
 import logoDark from "@/assets/logo-dark.png";
 import authBackground from "@/assets/auth-background.png";
@@ -25,14 +25,14 @@ const Auth = () => {
   const { toast } = useToast();
   const { theme } = useTheme();
   const auth = useAuth();
-  const hasRedirected = useRef(false);
 
-  // Redireciona apenas UMA vez se já autenticado
+  // Redireciona apenas se já autenticado E não está carregando
   useEffect(() => {
-    if (hasRedirected.current) return;
+    // Não faz nada enquanto está carregando o estado de autenticação
+    if (auth.loading) return;
     
-    if (!auth.loading && auth.user) {
-      hasRedirected.current = true;
+    // Se já autenticado, redireciona
+    if (auth.user) {
       navigate("/dashboard", { replace: true });
     }
   }, [auth.user, auth.loading, navigate]);
@@ -46,26 +46,26 @@ const Auth = () => {
       if (isLogin) {
         await auth.login(email, password);
         toast({ title: "Bem-vindo!", description: "Entrou com sucesso." });
-        navigate("/dashboard", { replace: true });
+        // Não precisa navegar aqui - o useEffect acima vai fazer isso
       } else {
         const username = fullName || email.split("@")[0];
         await register(email, username, password);
         toast({ title: "Conta criada!", description: "Registo efetuado com sucesso." });
         await auth.login(email, password);
-        navigate("/dashboard", { replace: true });
+        // Não precisa navegar aqui - o useEffect acima vai fazer isso
       }
     } catch (error: unknown) {
       const err = error as { message?: string; response?: { data?: unknown } };
       const description = err.response?.data || err.message || "Erro desconhecido";
       toast({ title: "Erro", description: String(description), variant: "destructive" });
-    } finally {
-      setLoading(false);
+      setLoading(false); // Só volta loading false se houver erro
     }
-  }, [loading, isLogin, email, password, fullName, auth, toast, navigate]);
+    // Não coloca setLoading(false) aqui - deixa o loading ativo até o redirect
+  }, [loading, isLogin, email, password, fullName, auth, toast]);
 
   // Google Login usando @react-oauth/google
   const googleLogin = useGoogleLogin({
-    onSuccess: useCallback(async (tokenResponse: any) => {
+    onSuccess: useCallback(async (tokenResponse: TokenResponse) => {
       if (loading) return;
       
       setLoading(true);
@@ -91,7 +91,7 @@ const Auth = () => {
           description: "Login com Google efetuado com sucesso.",
         });
 
-        navigate("/dashboard", { replace: true });
+        // Não precisa navegar aqui - o useEffect acima vai fazer isso
       } catch (error: unknown) {
         const err = error as { message?: string; response?: { data?: unknown } };
         const description = err.response?.data || err.message || "Erro no login com Google";
@@ -100,19 +100,20 @@ const Auth = () => {
           description: String(description),
           variant: "destructive",
         });
-      } finally {
         setLoading(false);
       }
-    }, [loading, auth, toast, navigate]),
+    }, [loading, auth, toast]),
     onError: useCallback(() => {
       toast({
         title: "Erro",
         description: "Erro ao autenticar com Google",
         variant: "destructive",
       });
+      setLoading(false);
     }, [toast]),
   });
 
+  // Mostra loading enquanto verifica autenticação
   if (auth.loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">

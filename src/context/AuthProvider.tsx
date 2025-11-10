@@ -18,7 +18,6 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
         const token = localStorage.getItem("accessToken");
         if (!token) {
           setUser(null);
-          setLoading(false);
           return;
         }
 
@@ -38,7 +37,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     };
 
     load();
-  }, []);
+  }, []); // Dependências vazias - executa apenas uma vez
 
   const login = async (email: string, password: string) => {
     await apiLogin(email, password);

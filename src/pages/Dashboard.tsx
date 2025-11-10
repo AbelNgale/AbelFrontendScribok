@@ -6,20 +6,20 @@ import { useAuth } from "@/hooks/useAuth";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { useToast } from "@/hooks/use-toast";
-import { Plus, BookOpen, Eye, Download, MessageSquare, Sparkles, ChevronRight, Trash2, Edit, ChevronLeft } from "lucide-react";
+import { Plus, BookOpen, Eye, Download, MessageSquare, ChevronRight, Trash2, Edit, ChevronLeft } from "lucide-react";
 import logo from "@/assets/logo.png";
 import logoDark from "@/assets/logo-dark.png";
 import BottomNav from "@/components/BottomNav";
-import { Carousel, CarouselContent, CarouselItem, CarouselPrevious, CarouselNext, type CarouselApi } from "@/components/ui/carousel";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Carousel, CarouselContent, CarouselItem, type CarouselApi } from "@/components/ui/carousel";
+import { Dialog, DialogContent, DialogFooter } from "@/components/ui/dialog";
 import jsPDF from "jspdf";
 import { sanitizeHtml } from "@/lib/utils";
-
 
 interface Profile {
   full_name: string;
   email: string;
 }
+
 interface Ebook {
   id: string;
   title: string;
@@ -32,6 +32,7 @@ interface Ebook {
   created_at: string;
   author: string | null;
 }
+
 interface Template {
   id: string;
   name: string;
@@ -40,6 +41,7 @@ interface Template {
   category: string;
   suggested_pages: string;
 }
+
 const Dashboard = () => {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [ebooks, setEbooks] = useState<Ebook[]>([]);
@@ -53,46 +55,46 @@ const Dashboard = () => {
   const [ebooksCarouselApi, setEbooksCarouselApi] = useState<CarouselApi>();
   const [genresCarouselApi, setGenresCarouselApi] = useState<CarouselApi>();
   const navigate = useNavigate();
-  const {
-    toast
-  } = useToast();
+  const { toast } = useToast();
   const { theme } = useTheme();
+  const auth = useAuth();
+
+  // Verifica autenticação apenas uma vez
   useEffect(() => {
-    checkUser();
-    fetchData();
-  }, []);
-  const checkUser = async () => {
-    const {
-      data: {
-        session
-      }
-    } = await supabase.auth.getSession();
-    if (!session) {
-      
-      navigate("/auth");
+    if (auth.loading) return; // Aguarda verificação de auth
+    
+    if (!auth.user) {
+      navigate("/auth", { replace: true });
       return;
     }
-    const {
-      data
-    } = await supabase.from("profiles").select("*").eq("id", session.user.id).single();
-    if (data) {
-      setProfile(data);
-    }
-  };
+
+    // Se chegou aqui, está autenticado - carrega dados
+    fetchData();
+  }, [auth.user, auth.loading, navigate]);
+
   const fetchData = async () => {
-    const {
-      data: {
-        session
-      }
-    } = await supabase.auth.getSession();
+    const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
 
+    // Fetch profile
+    const { data: profileData } = await supabase
+      .from("profiles")
+      .select("*")
+      .eq("id", session.user.id)
+      .single();
+    
+    if (profileData) {
+      setProfile(profileData);
+    }
+
     // Fetch ebooks
-    const {
-      data: ebooksData
-    } = await supabase.from("ebooks").select("*").eq("user_id", session.user.id).order("created_at", {
-      ascending: false
-    }).limit(6);
+    const { data: ebooksData } = await supabase
+      .from("ebooks")
+      .select("*")
+      .eq("user_id", session.user.id)
+      .order("created_at", { ascending: false })
+      .limit(6);
+
     if (ebooksData) {
       setEbooks(ebooksData);
       const totalViews = ebooksData.reduce((sum, book) => sum + book.views, 0);
@@ -105,9 +107,11 @@ const Dashboard = () => {
     }
 
     // Fetch templates
-    const {
-      data: templatesData
-    } = await supabase.from("templates").select("*").limit(3);
+    const { data: templatesData } = await supabase
+      .from("templates")
+      .select("*")
+      .limit(3);
+
     if (templatesData) {
       setTemplates(templatesData);
     }
@@ -140,7 +144,6 @@ const Dashboard = () => {
     if (!selectedEbook) return;
 
     try {
-      // Helper function to convert HTML to plain text
       const htmlToText = (html: string) => {
         const temp = document.createElement('div');
         temp.innerHTML = html;
@@ -156,7 +159,6 @@ const Dashboard = () => {
       const pdf = new jsPDF();
       let yPosition = 20;
 
-      // Cover page with image
       if (selectedEbook.cover_image) {
         try {
           const img = new Image();
@@ -165,24 +167,19 @@ const Dashboard = () => {
             img.onload = () => resolve();
           });
           
-          // Get page dimensions
           const pageWidth = pdf.internal.pageSize.getWidth();
           const pageHeight = pdf.internal.pageSize.getHeight();
-          
-          // Calculate dimensions to cover entire page
           const imgRatio = img.width / img.height;
           const pageRatio = pageWidth / pageHeight;
           
           let finalWidth, finalHeight, xOffset, yOffset;
           
           if (imgRatio > pageRatio) {
-            // Image is wider - fit to height and crop width
             finalHeight = pageHeight;
             finalWidth = finalHeight * imgRatio;
             xOffset = (pageWidth - finalWidth) / 2;
             yOffset = 0;
           } else {
-            // Image is taller - fit to width and crop height
             finalWidth = pageWidth;
             finalHeight = finalWidth / imgRatio;
             xOffset = 0;
@@ -195,7 +192,6 @@ const Dashboard = () => {
         }
       }
 
-      // Title page
       pdf.addPage();
       yPosition = 20;
 
@@ -210,7 +206,6 @@ const Dashboard = () => {
         pdf.text(`Escrito por ${selectedEbook.author}`, 20, yPosition);
       }
 
-      // Description page
       if (selectedEbook.description) {
         pdf.addPage();
         yPosition = 20;
@@ -220,7 +215,6 @@ const Dashboard = () => {
         pdf.text(descLines, 20, yPosition);
       }
 
-      // Chapters
       chapters?.forEach((chapter) => {
         pdf.addPage();
         yPosition = 20;
@@ -246,7 +240,6 @@ const Dashboard = () => {
 
       pdf.save(`${htmlToText(selectedEbook.title)}.pdf`);
       
-      // Update downloads count
       await supabase
         .from("ebooks")
         .update({ downloads: selectedEbook.downloads + 1 })
@@ -266,7 +259,21 @@ const Dashboard = () => {
       });
     }
   };
-  return <div className="min-h-screen bg-background">
+
+  // Mostra loading enquanto verifica auth
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
       {/* Header */}
       <header className="border-b bg-card/50 backdrop-blur-sm sticky top-0 z-10">
         <div className="container mx-auto px-4 py-4 flex items-center justify-between">
@@ -281,9 +288,6 @@ const Dashboard = () => {
       </header>
 
       <main className="container mx-auto px-4 py-8 pb-24 space-y-8">
-        {/* Welcome Section */}
-        
-
         {/* Stats Cards */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <Card className="p-6 bg-gradient-card shadow-card">
@@ -331,7 +335,8 @@ const Dashboard = () => {
               Ver todos <ChevronRight className="h-4 w-4 ml-1" />
             </Button>
           </div>
-          {ebooks.length === 0 ? <Card className="p-12 text-center">
+          {ebooks.length === 0 ? (
+            <Card className="p-12 text-center">
               <BookOpen className="h-16 w-16 mx-auto text-muted-foreground mb-4" />
               <h4 className="text-lg font-semibold mb-2">Nenhum ebook ainda</h4>
               <p className="text-muted-foreground mb-4">
@@ -341,10 +346,13 @@ const Dashboard = () => {
                 <Plus className="mr-2 h-4 w-4" />
                 Criar Ebook
               </Button>
-            </Card> : <div>
+            </Card>
+          ) : (
+            <div>
               <Carousel setApi={setEbooksCarouselApi} className="w-full max-w-full">
                 <CarouselContent className="-ml-2 md:-ml-3">
-                  {ebooks.map(ebook => <CarouselItem key={ebook.id} className="pl-2 md:pl-3 basis-[45%] md:basis-1/3 lg:basis-1/4">
+                  {ebooks.map(ebook => (
+                    <CarouselItem key={ebook.id} className="pl-2 md:pl-3 basis-[45%] md:basis-1/3 lg:basis-1/4">
                       <Card 
                         className="p-3 hover:shadow-card transition-shadow cursor-pointer"
                         onClick={() => setSelectedEbook(ebook)}
@@ -375,7 +383,8 @@ const Dashboard = () => {
                           </span>
                         </div>
                       </Card>
-                    </CarouselItem>)}
+                    </CarouselItem>
+                  ))}
                 </CarouselContent>
               </Carousel>
               <div className="flex justify-center gap-2 mt-4">
@@ -394,7 +403,8 @@ const Dashboard = () => {
                   <ChevronRight className="h-4 w-4" />
                 </Button>
               </div>
-            </div>}
+            </div>
+          )}
         </div>
 
         {/* Explorar por Gênero */}
@@ -408,11 +418,13 @@ const Dashboard = () => {
           <div>
             <Carousel setApi={setGenresCarouselApi} className="w-full max-w-full">
               <CarouselContent className="-ml-2 md:-ml-3">
-                {["Romance", "Thriller", "Inspiração", "Ficção Científica", "Mistério"].map(genre => <CarouselItem key={genre} className="pl-2 md:pl-3 basis-[45%] md:basis-1/3 lg:basis-1/4">
+                {["Romance", "Thriller", "Inspiração", "Ficção Científica", "Mistério"].map(genre => (
+                  <CarouselItem key={genre} className="pl-2 md:pl-3 basis-[45%] md:basis-1/3 lg:basis-1/4">
                     <Card className="p-6 hover:shadow-card transition-shadow cursor-pointer bg-gradient-secondary">
                       <h4 className="font-semibold text-white text-center">{genre}</h4>
                     </Card>
-                  </CarouselItem>)}
+                  </CarouselItem>
+                ))}
               </CarouselContent>
             </Carousel>
             <div className="flex justify-center gap-2 mt-4">
@@ -433,18 +445,8 @@ const Dashboard = () => {
             </div>
           </div>
         </div>
-
-        {/* Recomendado para Ti */}
-        
-
-        {/* Publicados por Mim */}
-        
-
-        {/* Ebooks Recentes */}
-        
       </main>
 
-      {/* Bottom Navigation */}
       <BottomNav />
 
       {/* Ebook Details Dialog */}
@@ -542,6 +544,8 @@ const Dashboard = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </div>;
+    </div>
+  );
 };
+
 export default Dashboard;
