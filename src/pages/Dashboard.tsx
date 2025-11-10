@@ -68,6 +68,7 @@ const Dashboard = () => {
       }
     } = await supabase.auth.getSession();
     if (!session) {
+      
       navigate("/auth");
       return;
     }
