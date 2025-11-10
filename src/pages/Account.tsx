@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState ,useCallback } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/hooks/useAuth";
@@ -56,24 +56,46 @@ const Account = () => {
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const auth = useAuth();
 
-  const auth = useAuth(); // { user, logout, loading, ... }
+  // Função memoizada para mapear profile
+  const mapToProfile = useCallback((u: unknown): Profile => {
+    if (!u) return {};
+    const obj = u as Record<string, unknown>;
+    const full_name =
+      typeof obj.full_name === "string"
+        ? obj.full_name
+        : typeof obj.name === "string"
+        ? obj.name
+        : typeof obj.username === "string"
+        ? obj.username
+        : "";
+    const email = typeof obj.email === "string" ? obj.email : "";
+    const avatar_url =
+      typeof obj.avatar_url === "string"
+        ? obj.avatar_url
+        : typeof obj.avatar === "string"
+        ? obj.avatar
+        : undefined;
+    return { full_name, email, avatar_url };
+  }, []);
 
-  // Sincroniza profile com auth.user; redireciona se não autenticado
+  // Sincroniza profile com auth.user
   useEffect(() => {
     if (auth.loading) return;
+    
     if (!auth.user) {
-      navigate("/auth");
+      navigate("/auth", { replace: true });
       return;
     }
 
     setProfile(mapToProfile(auth.user));
-  }, [auth.user, auth.loading, navigate]);
+  }, [auth.user, auth.loading, navigate, mapToProfile]);
 
-  const handleLogout = async () => {
+  const handleLogout = useCallback(async () => {
     try {
       await auth.logout();
-      navigate("/auth");
+      navigate("/auth", { replace: true });
     } catch {
       toast({
         title: "Erro ao sair",
@@ -81,7 +103,19 @@ const Account = () => {
         variant: "destructive",
       });
     }
-  };
+  }, [auth, navigate, toast]);
+
+  // Mostrar loading
+  if (auth.loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
+          <p className="text-muted-foreground">Carregando...</p>
+        </div>
+      </div>
+    );
+  }
 
   const menuItems = [
     {
